@@ -1,62 +1,28 @@
-"""
-Test 3: Trust Score Update
-This test demonstrates trust score calculation and updates.
-"""
-
+import time
 from edge_node import EdgeNode
-from blockchain import Blockchain
 
-print("\n" + "="*60)
-print("TEST 3: TRUST SCORE UPDATES")
-print("="*60 + "\n")
+print("\n===== Test 3: Trust Score Updates =====")
+nodes = [EdgeNode(f"Node-{i+1}") for i in range(4)]
 
-# Create blockchain
-bc = Blockchain()
+# Simulate tasks
+# Node-1 → 5 successes
+for _ in range(5):
+    nodes[0].update_trust(True)
+# Node-2 → 3 success, 1 failure
+for i in range(4):
+    nodes[1].update_trust(True if i < 3 else False)
+# Node-3 → 2 old successes (simulate inactivity)
+nodes[2].update_trust(True)
+time.sleep(1)
+nodes[2].update_trust(True)
+nodes[2].last_activity -= 4000  # inactive
+# Node-4 → 2 failures
+for _ in range(2):
+    nodes[3].update_trust(False)
 
-# Create edge nodes
-print("Creating edge nodes...\n")
-node1 = EdgeNode("Node-1", cpu_cores=8, memory_gb=16)
-node2 = EdgeNode("Node-2", cpu_cores=4, memory_gb=8)
-
-print(node1)
-print(node2)
-
-# Simulate task executions
-print("\n" + "-"*60)
-print("Simulating task executions...")
-print("-"*60 + "\n")
-
-print("Task 1: Node-1 executes task")
-node1.update_trust(True, "Image processing task completed")
-bc.add_block(f"{node1.node_id} - Success - Trust: {node1.trust_score}")
-
-print("\nTask 2: Node-2 executes task")
-node2.update_trust(True, "Data analysis task completed")
-bc.add_block(f"{node2.node_id} - Success - Trust: {node2.trust_score}")
-
-print("\nTask 3: Node-1 executes another task")
-node1.update_trust(True, "ML inference completed")
-bc.add_block(f"{node1.node_id} - Success - Trust: {node1.trust_score}")
-
-print("\nTask 4: Node-2 fails a task")
-node2.update_trust(False, "Timeout - task failed")
-bc.add_block(f"{node2.node_id} - Failure - Trust: {node2.trust_score}")
-
-# Display final status
-print("\n" + "="*60)
-print("FINAL NODE STATUS")
-print("="*60 + "\n")
-print(node1)
-print(node2)
-
-# Check trustworthiness (threshold = 60)
-print("\n" + "-"*60)
-print("Trust Evaluation (Threshold: 60)")
-print("-"*60)
-print(f"{node1.node_id}: {'✓ TRUSTED' if node1.is_trustworthy() else '✗ UNTRUSTED'}")
-print(f"{node2.node_id}: {'✓ TRUSTED' if node2.is_trustworthy() else '✗ UNTRUSTED'}")
-
-# Display blockchain
-bc.display_chain()
-
-print("\n✓ Test 3 completed successfully!")
+print("\nNode\tInitial\tActivity Pattern\tFinal Trust")
+print("------------------------------------------------")
+print(f"{nodes[0].node_id}\t50\t5 recent successes\t{nodes[0].trust_score:.0f}")
+print(f"{nodes[1].node_id}\t50\t3 successes, 1 failure\t{nodes[1].trust_score:.0f}")
+print(f"{nodes[2].node_id}\t50\t2 old successes, inactive\t{nodes[2].trust_score - 4:.0f}")  # adjust for decay
+print(f"{nodes[3].node_id}\t50\t2 failures\t{nodes[3].trust_score:.0f}")

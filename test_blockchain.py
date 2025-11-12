@@ -1,34 +1,20 @@
-"""
-Test 1: Creating Blockchain and Adding Blocks
-This test demonstrates blockchain creation and block linking.
-"""
-
 from blockchain import Blockchain
 
-print("\n" + "="*60)
-print("TEST 1: BLOCKCHAIN CREATION AND LINKING")
-print("="*60 + "\n")
-
-# Create blockchain
+print("\n===== Test 1: Blockchain Creation and Validator Rotation =====")
 bc = Blockchain()
+bc.add_validator("validator_1")
+bc.add_validator("validator_2")
+bc.add_validator("validator_3")
 
-# Add blocks with node registration data
-print("\nAdding blocks...")
-bc.add_block("Node-1 registered")
-bc.add_block("Node-2 registered")
-bc.add_block("Node-1 trust updated: success")
+# Add 6 blocks
+for i in range(6):
+    block = bc.add_block(f"Transaction {i+1}")
+    print(f"Block {block.index} added by {block.validator_id}")
 
-# Display blockchain
-bc.display_chain()
-
-# Verify chain integrity
 print("\nVerifying blockchain integrity...")
-bc.verify_chain()
+print("Integrity Check:", "✅ Passed" if bc.verify_chain() else "❌ Failed")
 
-# Display statistics
-print(f"\nTotal blocks in chain: {bc.get_block_count()}")
-
-# Save blockchain
-bc.save_to_file()
-
-print("\n✓ Test 1 completed successfully!")
+# Simulate tampering
+print("\n===== Test 2: Tampering Detection =====")
+bc.chain[3].data = "Tampered Data"
+print("After tampering → Integrity Check:", "✅ Passed" if bc.verify_chain() else "⚠️ Tampering Detected")
