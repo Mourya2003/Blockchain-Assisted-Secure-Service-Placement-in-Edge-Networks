@@ -1,159 +1,167 @@
 import streamlit as st
-import time
 import pandas as pd
-from blockchain import Blockchain
-from edge_node import EdgeNode
+import random
+import time
+
+# IMPORT YOUR RESEARCH ARCHITECTURE
+from components.blockchain import Blockchain
+from components.edge_node import EdgeNode
+from components.trust_manager import TrustManager
+from components.placement_controller import PlacementController
 
 # ==========================================
-# 1. SETUP & STATE MANAGEMENT
+# 1. SYSTEM INITIALIZATION (The Backend)
 # ==========================================
-st.set_page_config(page_title="EdgeGuard Sentinel", layout="wide")
+st.set_page_config(page_title="EdgeGuard Research Demo", layout="wide")
 
-# We need to keep the Blockchain alive in memory when you click buttons
-if 'blockchain' not in st.session_state:
-    # Initialize the Real Backend
-    bc = Blockchain()
+if 'system_initialized' not in st.session_state:
+    # A. Initialize Blockchain (The Ledger)
+    blockchain = Blockchain()
     validators = ["Admin_Server", "ISP_Gateway", "City_Council"]
-    for v in validators:
-        bc.add_validator(v)
+    for v in validators: blockchain.add_validator(v)
     
-    st.session_state.blockchain = bc
+    # B. Initialize Logic Engines
+    trust_manager = TrustManager()
+    placement_controller = PlacementController(blockchain)
     
-    # Create the Virtual Nodes
-    nodes = [
-        EdgeNode("Node-1"), # High Trust
-        EdgeNode("Node-2"), # Average
-        EdgeNode("Node-3"), # Malicious (will act bad)
-        EdgeNode("Node-4")  # Powerful but untrusted
-    ]
-    # Set initial trust scores for the demo
-    nodes[0].trust_score = 80
-    nodes[2].trust_score = 45 
-    nodes[3].trust_score = 55
+    # C. Create EXACTLY 6 Nodes (The Physical Layer)
+    nodes = []
+    # Nodes 1-3: High Performance, Good History
+    for i in range(1, 4):
+        n = EdgeNode(f"Node-{i}", initial_trust=random.randint(75, 95))
+        n.total_tasks = random.randint(20, 50)
+        n.success_count = n.total_tasks # 100% reliability start
+        nodes.append(n)
+        
+    # Node 4: Average/Neutral
+    n4 = EdgeNode("Node-4", initial_trust=65); n4.total_tasks=10; n4.success_count=8
+    nodes.append(n4)
+    
+    # Node 5: The "Sleeper" (High resources, but barely trusted)
+    n5 = EdgeNode("Node-5", initial_trust=55); n5.total_tasks=5; n5.success_count=3
+    nodes.append(n5)
+    
+    # Node 6: The Malicious Node
+    n6 = EdgeNode("Node-6", initial_trust=45); n6.total_tasks=50; n6.success_count=20
+    nodes.append(n6)
+
+    # Save to Session State (Memory)
+    st.session_state.blockchain = blockchain
+    st.session_state.trust_manager = trust_manager
+    st.session_state.placement_controller = placement_controller
     st.session_state.nodes = nodes
+    st.session_state.system_initialized = True
     
-    # Keep track of trust history for the chart
-    st.session_state.trust_history = pd.DataFrame(columns=[n.node_id for n in nodes])
+    # Chart Data
+    st.session_state.chart_data = pd.DataFrame(columns=[n.node_id for n in nodes])
 
 # ==========================================
-# 2. SIDEBAR - THE "CONTROL CENTER"
+# 2. SIDEBAR - THE "REALITY" CONTROLLER
 # ==========================================
-st.sidebar.header("🛠️ Node Control Panel")
-st.sidebar.write("Manually simulate edge behavior:")
+st.sidebar.header("⚡ Simulation Controls")
+st.sidebar.write("Manually trigger edge events:")
 
-# Control 1: Pick a Node
-selected_node_id = st.sidebar.selectbox("Select Target Node", [n.node_id for n in st.session_state.nodes])
-target_node = next(n for n in st.session_state.nodes if n.node_id == selected_node_id)
+# Select Node
+target_id = st.sidebar.selectbox("Target Node", [n.node_id for n in st.session_state.nodes])
+target_node = next(n for n in st.session_state.nodes if n.node_id == target_id)
 
-# Control 2: Force Outcome
-outcome = st.sidebar.radio("Force Task Outcome", ["SUCCESS (Good Behavior)", "FAILURE (Malicious/Error)"])
+# Select Outcome
+outcome = st.sidebar.radio("Event Outcome", ["SUCCESS (Verify)", "FAILURE (Attack)"])
 
-# Control 3: Trigger Button
-if st.sidebar.button("⚡ Run Simulation Task"):
-    # Determine success
-    is_success = True if "SUCCESS" in outcome else False
+if st.sidebar.button("Run Transaction"):
+    is_success = (outcome == "SUCCESS (Verify)")
     
-    # 1. RUN TRUST LOGIC (Your Code)
-    target_node.update_trust(is_success)
+    # 1. CALL TRUST MANAGER (Real Math)
+    old_score = target_node.trust_score
+    new_score = st.session_state.trust_manager.update_trust(target_node, is_success)
     
-    # 2. ADD TO BLOCKCHAIN (Your Code)
-    status_text = "Success" if is_success else "Failure"
-    txn_data = f"Task: {status_text} | Node: {target_node.node_id}"
-    new_block = st.session_state.blockchain.add_block(txn_data)
+    # 2. LOG TO BLOCKCHAIN (Real Crypto)
+    status_str = "SUCCESS" if is_success else "FAILURE"
+    txn = f"TASK: {target_node.node_id} | Result: {status_str}"
+    block = st.session_state.blockchain.add_block(txn)
     
-    # 3. Update History for Chart
-    new_row = {n.node_id: n.trust_score for n in st.session_state.nodes}
-    st.session_state.trust_history = pd.concat([st.session_state.trust_history, pd.DataFrame([new_row])], ignore_index=True)
-    
+    # 3. FEEDBACK
     if is_success:
-        st.sidebar.success(f"Task Verified! Trust increased to {target_node.trust_score:.1f}")
+        st.sidebar.success(f"Trust Increased: {old_score:.1f} -> {new_score:.1f}")
     else:
-        st.sidebar.error(f"Failure Detected! Penalty applied. Trust dropped to {target_node.trust_score:.1f}")
+        st.sidebar.error(f"Penalty Applied: {old_score:.1f} -> {new_score:.1f}")
+    
+    # 4. UPDATE CHART
+    new_row = {n.node_id: n.trust_score for n in st.session_state.nodes}
+    st.session_state.chart_data = pd.concat([st.session_state.chart_data, pd.DataFrame([new_row])], ignore_index=True)
 
 st.sidebar.markdown("---")
+st.sidebar.info(f"**Blockchain Height:** {len(st.session_state.blockchain.chain)} Blocks")
 
 # ==========================================
-# 3. MAIN DASHBOARD - "THE PRODUCT VIEW"
+# 3. MAIN DASHBOARD
 # ==========================================
-st.title("🛡️ EdgeGuard Sentinel")
-st.markdown("**Decentralized Trust & Service Placement Orchestrator**")
+st.title("🛡️ EdgeGuard: Secure Service Placement")
+st.markdown("### Live Network Status (6 Nodes)")
 
-# --- Top Metrics Row ---
-col1, col2, col3 = st.columns(3)
-col1.metric("Active Nodes", len(st.session_state.nodes))
-col2.metric("Consensus Protocol", "Proof-of-Authority (PoA)")
-col3.metric("Blockchain Height", len(st.session_state.blockchain.chain))
-
-# --- Section A: Network Visualization ---
-st.subheader("📡 Live Network Status")
-cols = st.columns(len(st.session_state.nodes))
-
+# A. NODE GRID
+cols = st.columns(3) # 2 Rows of 3
 for i, node in enumerate(st.session_state.nodes):
-    with cols[i]:
-        # Dynamic Color Logic
+    with cols[i % 3]:
+        # Determine Color based on Trust Threshold (60)
         if node.trust_score >= 60:
             color = "green"
-            icon = "✅"
-            status = "SECURE"
+            icon = "✅ SECURE"
+            border = "2px solid #28a745"
         elif node.trust_score >= 40:
             color = "orange"
-            icon = "⚠️"
-            status = "SUSPICIOUS"
+            icon = "⚠️ RISKY"
+            border = "2px solid #ffc107"
         else:
             color = "red"
-            icon = "🚫"
-            status = "BLOCKED"
-        
+            icon = "🚫 BANNED"
+            border = "2px solid #dc3545"
+            
         st.markdown(f"""
-        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; border-left: 5px solid {color};">
-            <h4>{icon} {node.node_id}</h4>
-            <p><strong>Trust:</strong> {node.trust_score:.1f}</p>
-            <p><strong>Tasks:</strong> {node.total_tasks}</p>
-            <p style="color:{color}; font-weight:bold;">{status}</p>
+        <div style="border: {border}; padding: 15px; border-radius: 10px; margin-bottom: 10px; background-color: #1e1e1e;">
+            <h3 style="margin:0; color:white;">{node.node_id}</h3>
+            <p style="margin:0; font-size: 1.2em; color: {color};"><strong>{node.trust_score:.1f}</strong></p>
+            <p style="margin:0; font-size: 0.9em; color: #aaa;">Tasks: {node.total_tasks} | {icon}</p>
         </div>
         """, unsafe_allow_html=True)
 
-# --- Section B: Service Placement Controller ---
+# B. PLACEMENT CONTROLLER SECTION
 st.markdown("---")
-st.subheader("🤖 Service Placement Controller")
+col1, col2 = st.columns([1, 2])
 
-if st.button("🚀 Deploy High-Priority Service"):
-    with st.spinner('Analyzing Trust Scores & Resources...'):
-        time.sleep(1) # Fake loading for effect
-        
-        # YOUR PLACEMENT LOGIC
-        candidates = [n for n in st.session_state.nodes if n.trust_score >= 60]
-        
-        if not candidates:
-            st.error("❌ CRITICAL SECURITY ALERT: No trusted nodes available! Deployment Aborted.")
-        else:
-            best_node = max(candidates, key=lambda x: x.trust_score)
+with col1:
+    st.subheader("🤖 Placement Controller")
+    st.write("Algorithm: `Filter(>60) -> Rank -> Select`")
+    
+    if st.button("🚀 Deploy Critical Service"):
+        with st.spinner("Analyzing Trust Scores & Blockchain History..."):
+            time.sleep(1) # UI Effect
             
-            # Show the Winner
-            st.success(f"✅ Deployment Successful! Service assigned to **{best_node.node_id}**")
+            # CALL PLACEMENT CONTROLLER (Real Logic)
+            selected, msg = st.session_state.placement_controller.request_placement(st.session_state.nodes)
             
-            # Show the Why (Transparency)
-            st.info(f"**Decision Logic:** Node {best_node.node_id} selected because Trust ({best_node.trust_score:.1f}) > 60 and reliability is optimal.")
-            
-            # Log to Blockchain
-            st.session_state.blockchain.add_block(f"DEPLOYMENT: Assigned to {best_node.node_id}")
+            if selected:
+                st.success(f"**DEPLOYED TO: {selected.node_id}**")
+                st.info(f"Trust Score: {selected.trust_score:.1f}")
+                st.caption(f"Transaction logged to Blockchain.")
+            else:
+                st.error(msg)
 
-# --- Section C: Trust Evolution Chart ---
-st.subheader("📈 Trust Score Evolution")
-if not st.session_state.trust_history.empty:
-    st.line_chart(st.session_state.trust_history)
-else:
-    st.write("Waiting for simulation data...")
+with col2:
+    st.subheader("📈 Trust Evolution")
+    if not st.session_state.chart_data.empty:
+        st.line_chart(st.session_state.chart_data)
+    else:
+        st.info("Run simulations in the sidebar to see live data.")
 
-# --- Section D: Immutable Ledger ---
-with st.expander("🔍 View Blockchain Ledger (Audit Trail)", expanded=False):
+# C. BLOCKCHAIN LEDGER
+with st.expander("🔍 View Immutable Ledger (SHA-256 Hashes)"):
     chain_data = []
-    for block in st.session_state.blockchain.chain:
+    for b in st.session_state.blockchain.chain:
         chain_data.append({
-            "Index": block.index,
-            "Timestamp": block.timestamp,
-            "Validator": block.validator_id,
-            "Data": block.data,
-            "Hash": block.hash
+            "Block": b.index,
+            "Validator": b.validator_id,
+            "Data": b.data,
+            "Hash": b.hash
         })
     st.dataframe(pd.DataFrame(chain_data))
