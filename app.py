@@ -1,157 +1,235 @@
+# app.py - COMPLETE REWRITE
+"""
+TrafficGuard: Blockchain-Secured Evidence Management System
+Real product that uses your research architecture
+"""
 import streamlit as st
 import pandas as pd
-import random
 import time
+import random
+from config import *
+from product.traffic_monitor import TrafficCamera
+from product.violation_detector import ViolationDetector
+from product.evidence_validator import EvidenceValidator
 
-# IMPORT YOUR RESEARCH ARCHITECTURE (Same Backend!)
+# Import your RESEARCH components (unchanged)
 from components.blockchain import Blockchain
 from components.edge_node import EdgeNode
 from components.trust_manager import TrustManager
 from components.placement_controller import PlacementController
 
 # ==========================================
-# 1. SYSTEM INITIALIZATION (The Backend)
+# SYSTEM INITIALIZATION
 # ==========================================
-st.set_page_config(page_title="CityGuard Traffic Ops", layout="wide")
+st.set_page_config(
+    page_title="TrafficGuard Evidence System",
+    page_icon="🚦",
+    layout="wide"
+)
 
-if 'system_initialized' not in st.session_state:
-    # A. Initialize Blockchain
+if 'initialized' not in st.session_state:
+    # Core blockchain system (your research)
     blockchain = Blockchain()
-    validators = ["City_Hall_Server", "Traffic_Control_HQ", "Police_Dept_Node"]
-    for v in validators: blockchain.add_validator(v)
+    for validator in VALIDATORS:
+        blockchain.add_validator(validator)
     
-    # B. Initialize Logic
     trust_manager = TrustManager()
     placement_controller = PlacementController(blockchain)
     
-    # C. Create SMART CITY NODES (Rebranded)
-    nodes = []
+    # Product layer (new)
+    violation_detector = ViolationDetector(blockchain, trust_manager)
+    evidence_validator = EvidenceValidator(blockchain)
     
-    # High Trust Cameras
-    n1 = EdgeNode("Cam-Main-St", initial_trust=95); n1.total_tasks=100; n1.success_count=98; nodes.append(n1)
-    n2 = EdgeNode("Signal-5th-Ave", initial_trust=88); n2.total_tasks=80; n2.success_count=75; nodes.append(n2)
-    n3 = EdgeNode("Sensor-Hwy-101", initial_trust=92); n3.total_tasks=120; n3.success_count=118; nodes.append(n3)
+    # Create camera network
+    cameras = {}
+    camera_nodes = []
     
-    # The "Glitchy" Camera
-    n4 = EdgeNode("Cam-River-Rd", initial_trust=65); n4.total_tasks=40; n4.success_count=30; nodes.append(n4)
+    for cam_id, cam_info in CAMERA_LOCATIONS.items():
+        # Create product camera
+        cameras[cam_id] = TrafficCamera(
+            cam_id, 
+            cam_info['location'], 
+            cam_info['type']
+        )
+        
+        # Create blockchain node for this camera
+        node = EdgeNode(cam_id, initial_trust=random.randint(60, 95))
+        node.total_tasks = random.randint(50, 150)
+        node.success_count = int(node.total_tasks * random.uniform(0.7, 0.95))
+        camera_nodes.append(node)
     
-    # The "Compromised" Unit (Sleeper)
-    n5 = EdgeNode("Signal-West-End", initial_trust=55); n5.total_tasks=20; n5.success_count=12; nodes.append(n5)
-    
-    # The "Hacked" Unit
-    n6 = EdgeNode("Cam-Market-Sq", initial_trust=45); n6.total_tasks=60; n6.success_count=25; nodes.append(n6)
-
-    st.session_state.blockchain = blockchain
-    st.session_state.trust_manager = trust_manager
-    st.session_state.placement_controller = placement_controller
-    st.session_state.nodes = nodes
-    st.session_state.system_initialized = True
-    
-    # Chart Data
-    st.session_state.chart_data = pd.DataFrame(columns=[n.node_id for n in nodes])
-
-# ==========================================
-# 2. SIDEBAR - TRAFFIC SIMULATOR
-# ==========================================
-st.sidebar.header("🚦 Traffic Simulation")
-st.sidebar.write("Inject Event Stream:")
-
-# Select Unit
-target_id = st.sidebar.selectbox("Select Traffic Unit", [n.node_id for n in st.session_state.nodes])
-target_node = next(n for n in st.session_state.nodes if n.node_id == target_id)
-
-# Select Scenario
-scenario = st.sidebar.radio("Data Stream Integrity", ["VALID DATA (Normal)", "CORRUPTED (Hack Attempt)"])
-
-if st.sidebar.button("📡 Transmit Data Packet"):
-    is_success = (scenario == "VALID DATA (Normal)")
-    
-    # 1. REAL LOGIC (Same Code!)
-    old_score = target_node.trust_score
-    new_score = st.session_state.trust_manager.update_trust(target_node, is_success)
-    
-    # 2. BLOCKCHAIN LOG
-    status_str = "VERIFIED" if is_success else "TAMPERED"
-    txn = f"UNIT: {target_node.node_id} | DATA: {status_str} | TIMESTAMP: {time.time()}"
-    block = st.session_state.blockchain.add_block(txn)
-    
-    # 3. FEEDBACK
-    if is_success:
-        st.sidebar.success(f"Packet Verified. Integrity Score: {new_score:.1f}")
-    else:
-        st.sidebar.error(f"🚨 ANOMALY DETECTED! Integrity Score Dropped: {new_score:.1f}")
-    
-    # 4. UPDATE CHART
-    new_row = {n.node_id: n.trust_score for n in st.session_state.nodes}
-    st.session_state.chart_data = pd.concat([st.session_state.chart_data, pd.DataFrame([new_row])], ignore_index=True)
-
-st.sidebar.markdown("---")
-st.sidebar.info(f"**Ledger Height:** {len(st.session_state.blockchain.chain)} Blocks")
+    st.session_state.update({
+        'initialized': True,
+        'blockchain': blockchain,
+        'trust_manager': trust_manager,
+        'placement_controller': placement_controller,
+        'violation_detector': violation_detector,
+        'evidence_validator': evidence_validator,
+        'cameras': cameras,
+        'camera_nodes': camera_nodes,
+        'violation_log': []
+    })
 
 # ==========================================
-# 3. MAIN DASHBOARD - SMART CITY OPS
+# MAIN DASHBOARD
 # ==========================================
-st.title("🏙️ CityGuard: Traffic Infrastructure Security")
-st.markdown("### 🟢 Live Infrastructure Status")
+st.title("🚦 TrafficGuard: Evidence Management System")
+st.markdown("### Blockchain-Secured Traffic Violation Processing")
 
-# A. NODE GRID
+# Metrics Row
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    total_cams = len(st.session_state.camera_nodes)
+    st.metric("Active Cameras", total_cams)
+with col2:
+    trusted_cams = sum(1 for n in st.session_state.camera_nodes 
+                       if n.trust_score >= EVIDENCE_TRUST_THRESHOLD)
+    st.metric("Court-Admissible Cameras", trusted_cams)
+with col3:
+    st.metric("Blockchain Integrity", 
+              "✅ Valid" if st.session_state.blockchain.is_chain_valid() else "❌ Compromised")
+with col4:
+    st.metric("Total Violations Processed", len(st.session_state.violation_log))
+
+st.markdown("---")
+
+# Camera Network Status
+st.subheader("📷 Camera Network Status")
 cols = st.columns(3)
-for i, node in enumerate(st.session_state.nodes):
-    with cols[i % 3]:
-        # Determine Color based on Trust
-        if node.trust_score >= 60:
-            color = "#00ff00"; bg="#113311"; icon = "✅ ONLINE"
-        elif node.trust_score >= 40:
-            color = "orange"; bg="#332200"; icon = "⚠️ UNSTABLE"
+for idx, node in enumerate(st.session_state.camera_nodes):
+    with cols[idx % 3]:
+        # Determine status
+        if node.trust_score >= EVIDENCE_TRUST_THRESHOLD:
+            status = "🟢 EVIDENCE-GRADE"
+            color = "#00ff00"
+            bg = "#113311"
+        elif node.trust_score >= DEPLOYMENT_TRUST_THRESHOLD:
+            status = "🟡 MONITORING ONLY"
+            color = "#ffaa00"
+            bg = "#332200"
         else:
-            color = "red"; bg="#330000"; icon = "🚫 COMPROMISED"
-            
+            status = "🔴 COMPROMISED"
+            color = "#ff0000"
+            bg = "#330000"
+        
+        cam_info = CAMERA_LOCATIONS[node.node_id]
+        reliability = (node.success_count / node.total_tasks * 100 
+                      if node.total_tasks > 0 else 0)
+        
         st.markdown(f"""
-        <div style="border: 1px solid {color}; padding: 15px; border-radius: 5px; margin-bottom: 10px; background-color: {bg};">
-            <h4 style="margin:0; color:white;">📷 {node.node_id}</h4>
-            <p style="margin:0; font-size: 1.1em; color: {color};"><strong>Integrity: {node.trust_score:.1f}%</strong></p>
-            <p style="margin:0; font-size: 0.8em; color: #ccc;">Uptime: {node.total_tasks} hrs | {icon}</p>
+        <div style="border: 2px solid {color}; padding: 15px; border-radius: 8px; 
+                    background-color: {bg}; margin-bottom: 15px;">
+            <h4 style="margin:0; color:white;">{node.node_id}</h4>
+            <p style="margin:5px 0; font-size:0.9em; color:#ccc;">{cam_info['location']}</p>
+            <p style="margin:5px 0; font-size:0.85em; color:#ccc;">{cam_info['type']}</p>
+            <hr style="border-color:#555; margin:10px 0;">
+            <p style="margin:0; font-size:1.2em; color:{color};"><strong>Trust: {node.trust_score:.1f}%</strong></p>
+            <p style="margin:5px 0; font-size:0.9em; color:#ccc;">Reliability: {reliability:.1f}%</p>
+            <p style="margin:5px 0; font-size:0.9em; color:{color};"><strong>{status}</strong></p>
         </div>
         """, unsafe_allow_html=True)
 
-# B. CRITICAL SERVICE DEPLOYMENT
 st.markdown("---")
-col1, col2 = st.columns([1, 1])
 
-with col1:
-    st.subheader("🚑 Emergency AI Deployment")
-    st.write("Deploy **'Ambulance_Green_Wave_AI'** to the most secure intersection controller.")
+# Violation Processing Simulator
+col_left, col_right = st.columns([1, 1])
+
+with col_left:
+    st.subheader("🚨 Live Violation Detection")
     
-    if st.button("🚀 Deploy Critical Traffic Model"):
-        with st.spinner("Auditing Infrastructure Security..."):
-            time.sleep(1.5)
+    selected_cam_id = st.selectbox(
+        "Select Camera", 
+        list(st.session_state.cameras.keys()),
+        format_func=lambda x: f"{x} - {CAMERA_LOCATIONS[x]['location']}"
+    )
+    
+    selected_camera = st.session_state.cameras[selected_cam_id]
+    selected_node = next(n for n in st.session_state.camera_nodes 
+                        if n.node_id == selected_cam_id)
+    
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("📸 Capture Violation", use_container_width=True):
+            # Simulate real camera capture
+            violation_data, is_valid = selected_camera.capture_violation()
             
-            # CALL PLACEMENT CONTROLLER
-            selected, msg = st.session_state.placement_controller.request_placement(st.session_state.nodes)
+            if violation_data:
+                # Process through your research system
+                accepted, reason = st.session_state.violation_detector.process_violation(
+                    selected_node, violation_data, is_valid
+                )
+                
+                # Validate for court evidence
+                is_admissible, report = st.session_state.evidence_validator.validate_evidence_chain(
+                    selected_node, violation_data
+                )
+                
+                # Store result
+                st.session_state.violation_log.append({
+                    'timestamp': violation_data['timestamp'],
+                    'camera': selected_cam_id,
+                    'violation': violation_data['violation_type'],
+                    'plate': violation_data['vehicle_plate'],
+                    'valid_capture': is_valid,
+                    'admissible': is_admissible,
+                    'trust_after': selected_node.trust_score
+                })
+                
+                # Display result
+                if is_admissible:
+                    st.success(f"✅ EVIDENCE ACCEPTED")
+                    st.info(f"**Violation:** {violation_data['violation_type']}\n\n"
+                           f"**Vehicle:** {violation_data['plate']}\n\n"
+                           f"**Status:** Court-admissible evidence")
+                else:
+                    st.warning(f"⚠️ EVIDENCE REJECTED")
+                    st.error(f"**Reason:** {report['trust_check']} Trust Check\n\n"
+                            f"**Current Trust:** {report['trust_score']:.1f}%")
+    
+    with col_b:
+        if st.button("🔨 Simulate Camera Hack", use_container_width=True):
+            # Simulate malicious activity
+            tamper_data = selected_camera.simulate_tampering()
             
-            if selected:
-                st.success(f"**DEPLOYMENT SUCCESSFUL**")
-                st.write(f"Target: **{selected.node_id}**")
-                st.write(f"Security Rating: **{selected.trust_score:.1f}** (Highest Available)")
-                st.info("The system automatically bypassed compromised units (Red/Orange).")
-            else:
-                st.error(msg)
+            # Process as failure
+            st.session_state.trust_manager.update_trust(selected_node, False)
+            st.session_state.blockchain.add_block(
+                f"SECURITY_ALERT | {selected_cam_id} | Unauthorized access detected"
+            )
+            
+            st.error(f"🚨 SECURITY BREACH DETECTED\n\n"
+                    f"Camera {selected_cam_id} has been compromised!\n\n"
+                    f"Trust Score: {selected_node.trust_score:.1f}% (Dropped)")
 
-with col2:
-    st.subheader("📉 Integrity Evolution")
-    if not st.session_state.chart_data.empty:
-        st.line_chart(st.session_state.chart_data)
+with col_right:
+    st.subheader("📊 Recent Activity")
+    if st.session_state.violation_log:
+        df = pd.DataFrame(st.session_state.violation_log)
+        st.dataframe(df[['timestamp', 'camera', 'violation', 'admissible', 'trust_after']], 
+                    use_container_width=True)
     else:
-        st.info("Waiting for telemetry data...")
+        st.info("No violations processed yet")
 
-# C. AUDIT LOG
-with st.expander("👮 View Forensic Ledger (Blockchain Audit Trail)"):
-    chain_data = []
-    for b in st.session_state.blockchain.chain:
-        chain_data.append({
-            "Block ID": b.index,
-            "Validator Authority": b.validator_id,
-            "Event Log": b.data,
-            "Cryptographic Hash": b.hash
-        })
-    st.dataframe(pd.DataFrame(chain_data))
+# Evidence Validation Report
+st.markdown("---")
+st.subheader("⚖️ Evidence Validation Report")
+if st.button("Generate Court Report"):
+    with st.spinner("Validating camera network..."):
+        time.sleep(1)
+        
+        report_data = []
+        for node in st.session_state.camera_nodes:
+            is_valid, report = st.session_state.evidence_validator.validate_evidence_chain(
+                node, {'violation_type': 'System Check'}
+            )
+            report_data.append(report)
+        
+        st.dataframe(pd.DataFrame(report_data), use_container_width=True)
+
+# Blockchain Audit Trail
+with st.expander("🔍 View Blockchain Audit Trail"):
+    st.write("**Immutable Evidence Chain**")
+    for block in st.session_state.blockchain.chain:
+        st.text(f"Block #{block.index} | Validator: {block.validator_id}\n"
+               f"Data: {block.data}\n"
+               f"Hash: {block.hash[:32]}...\n")
