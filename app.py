@@ -3,7 +3,7 @@ import pandas as pd
 import random
 import time
 
-# IMPORT YOUR RESEARCH ARCHITECTURE
+# IMPORT YOUR RESEARCH ARCHITECTURE (Same Backend!)
 from components.blockchain import Blockchain
 from components.edge_node import EdgeNode
 from components.trust_manager import TrustManager
@@ -12,40 +12,35 @@ from components.placement_controller import PlacementController
 # ==========================================
 # 1. SYSTEM INITIALIZATION (The Backend)
 # ==========================================
-st.set_page_config(page_title="EdgeGuard Research Demo", layout="wide")
+st.set_page_config(page_title="CityGuard Traffic Ops", layout="wide")
 
 if 'system_initialized' not in st.session_state:
-    # A. Initialize Blockchain (The Ledger)
+    # A. Initialize Blockchain
     blockchain = Blockchain()
-    validators = ["Admin_Server", "ISP_Gateway", "City_Council"]
+    validators = ["City_Hall_Server", "Traffic_Control_HQ", "Police_Dept_Node"]
     for v in validators: blockchain.add_validator(v)
     
-    # B. Initialize Logic Engines
+    # B. Initialize Logic
     trust_manager = TrustManager()
     placement_controller = PlacementController(blockchain)
     
-    # C. Create EXACTLY 6 Nodes (The Physical Layer)
+    # C. Create SMART CITY NODES (Rebranded)
     nodes = []
-    # Nodes 1-3: High Performance, Good History
-    for i in range(1, 4):
-        n = EdgeNode(f"Node-{i}", initial_trust=random.randint(75, 95))
-        n.total_tasks = random.randint(20, 50)
-        n.success_count = n.total_tasks # 100% reliability start
-        nodes.append(n)
-        
-    # Node 4: Average/Neutral
-    n4 = EdgeNode("Node-4", initial_trust=65); n4.total_tasks=10; n4.success_count=8
-    nodes.append(n4)
     
-    # Node 5: The "Sleeper" (High resources, but barely trusted)
-    n5 = EdgeNode("Node-5", initial_trust=55); n5.total_tasks=5; n5.success_count=3
-    nodes.append(n5)
+    # High Trust Cameras
+    n1 = EdgeNode("Cam-Main-St", initial_trust=95); n1.total_tasks=100; n1.success_count=98; nodes.append(n1)
+    n2 = EdgeNode("Signal-5th-Ave", initial_trust=88); n2.total_tasks=80; n2.success_count=75; nodes.append(n2)
+    n3 = EdgeNode("Sensor-Hwy-101", initial_trust=92); n3.total_tasks=120; n3.success_count=118; nodes.append(n3)
     
-    # Node 6: The Malicious Node
-    n6 = EdgeNode("Node-6", initial_trust=45); n6.total_tasks=50; n6.success_count=20
-    nodes.append(n6)
+    # The "Glitchy" Camera
+    n4 = EdgeNode("Cam-River-Rd", initial_trust=65); n4.total_tasks=40; n4.success_count=30; nodes.append(n4)
+    
+    # The "Compromised" Unit (Sleeper)
+    n5 = EdgeNode("Signal-West-End", initial_trust=55); n5.total_tasks=20; n5.success_count=12; nodes.append(n5)
+    
+    # The "Hacked" Unit
+    n6 = EdgeNode("Cam-Market-Sq", initial_trust=45); n6.total_tasks=60; n6.success_count=25; nodes.append(n6)
 
-    # Save to Session State (Memory)
     st.session_state.blockchain = blockchain
     st.session_state.trust_manager = trust_manager
     st.session_state.placement_controller = placement_controller
@@ -56,112 +51,107 @@ if 'system_initialized' not in st.session_state:
     st.session_state.chart_data = pd.DataFrame(columns=[n.node_id for n in nodes])
 
 # ==========================================
-# 2. SIDEBAR - THE "REALITY" CONTROLLER
+# 2. SIDEBAR - TRAFFIC SIMULATOR
 # ==========================================
-st.sidebar.header("⚡ Simulation Controls")
-st.sidebar.write("Manually trigger edge events:")
+st.sidebar.header("🚦 Traffic Simulation")
+st.sidebar.write("Inject Event Stream:")
 
-# Select Node
-target_id = st.sidebar.selectbox("Target Node", [n.node_id for n in st.session_state.nodes])
+# Select Unit
+target_id = st.sidebar.selectbox("Select Traffic Unit", [n.node_id for n in st.session_state.nodes])
 target_node = next(n for n in st.session_state.nodes if n.node_id == target_id)
 
-# Select Outcome
-outcome = st.sidebar.radio("Event Outcome", ["SUCCESS (Verify)", "FAILURE (Attack)"])
+# Select Scenario
+scenario = st.sidebar.radio("Data Stream Integrity", ["VALID DATA (Normal)", "CORRUPTED (Hack Attempt)"])
 
-if st.sidebar.button("Run Transaction"):
-    is_success = (outcome == "SUCCESS (Verify)")
+if st.sidebar.button("📡 Transmit Data Packet"):
+    is_success = (scenario == "VALID DATA (Normal)")
     
-    # 1. CALL TRUST MANAGER (Real Math)
+    # 1. REAL LOGIC (Same Code!)
     old_score = target_node.trust_score
     new_score = st.session_state.trust_manager.update_trust(target_node, is_success)
     
-    # 2. LOG TO BLOCKCHAIN (Real Crypto)
-    status_str = "SUCCESS" if is_success else "FAILURE"
-    txn = f"TASK: {target_node.node_id} | Result: {status_str}"
+    # 2. BLOCKCHAIN LOG
+    status_str = "VERIFIED" if is_success else "TAMPERED"
+    txn = f"UNIT: {target_node.node_id} | DATA: {status_str} | TIMESTAMP: {time.time()}"
     block = st.session_state.blockchain.add_block(txn)
     
     # 3. FEEDBACK
     if is_success:
-        st.sidebar.success(f"Trust Increased: {old_score:.1f} -> {new_score:.1f}")
+        st.sidebar.success(f"Packet Verified. Integrity Score: {new_score:.1f}")
     else:
-        st.sidebar.error(f"Penalty Applied: {old_score:.1f} -> {new_score:.1f}")
+        st.sidebar.error(f"🚨 ANOMALY DETECTED! Integrity Score Dropped: {new_score:.1f}")
     
     # 4. UPDATE CHART
     new_row = {n.node_id: n.trust_score for n in st.session_state.nodes}
     st.session_state.chart_data = pd.concat([st.session_state.chart_data, pd.DataFrame([new_row])], ignore_index=True)
 
 st.sidebar.markdown("---")
-st.sidebar.info(f"**Blockchain Height:** {len(st.session_state.blockchain.chain)} Blocks")
+st.sidebar.info(f"**Ledger Height:** {len(st.session_state.blockchain.chain)} Blocks")
 
 # ==========================================
-# 3. MAIN DASHBOARD
+# 3. MAIN DASHBOARD - SMART CITY OPS
 # ==========================================
-st.title("🛡️ EdgeGuard: Secure Service Placement")
-st.markdown("### Live Network Status (6 Nodes)")
+st.title("🏙️ CityGuard: Traffic Infrastructure Security")
+st.markdown("### 🟢 Live Infrastructure Status")
 
 # A. NODE GRID
-cols = st.columns(3) # 2 Rows of 3
+cols = st.columns(3)
 for i, node in enumerate(st.session_state.nodes):
     with cols[i % 3]:
-        # Determine Color based on Trust Threshold (60)
+        # Determine Color based on Trust
         if node.trust_score >= 60:
-            color = "green"
-            icon = "✅ SECURE"
-            border = "2px solid #28a745"
+            color = "#00ff00"; bg="#113311"; icon = "✅ ONLINE"
         elif node.trust_score >= 40:
-            color = "orange"
-            icon = "⚠️ RISKY"
-            border = "2px solid #ffc107"
+            color = "orange"; bg="#332200"; icon = "⚠️ UNSTABLE"
         else:
-            color = "red"
-            icon = "🚫 BANNED"
-            border = "2px solid #dc3545"
+            color = "red"; bg="#330000"; icon = "🚫 COMPROMISED"
             
         st.markdown(f"""
-        <div style="border: {border}; padding: 15px; border-radius: 10px; margin-bottom: 10px; background-color: #1e1e1e;">
-            <h3 style="margin:0; color:white;">{node.node_id}</h3>
-            <p style="margin:0; font-size: 1.2em; color: {color};"><strong>{node.trust_score:.1f}</strong></p>
-            <p style="margin:0; font-size: 0.9em; color: #aaa;">Tasks: {node.total_tasks} | {icon}</p>
+        <div style="border: 1px solid {color}; padding: 15px; border-radius: 5px; margin-bottom: 10px; background-color: {bg};">
+            <h4 style="margin:0; color:white;">📷 {node.node_id}</h4>
+            <p style="margin:0; font-size: 1.1em; color: {color};"><strong>Integrity: {node.trust_score:.1f}%</strong></p>
+            <p style="margin:0; font-size: 0.8em; color: #ccc;">Uptime: {node.total_tasks} hrs | {icon}</p>
         </div>
         """, unsafe_allow_html=True)
 
-# B. PLACEMENT CONTROLLER SECTION
+# B. CRITICAL SERVICE DEPLOYMENT
 st.markdown("---")
-col1, col2 = st.columns([1, 2])
+col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("🤖 Placement Controller")
-    st.write("Algorithm: `Filter(>60) -> Rank -> Select`")
+    st.subheader("🚑 Emergency AI Deployment")
+    st.write("Deploy **'Ambulance_Green_Wave_AI'** to the most secure intersection controller.")
     
-    if st.button("🚀 Deploy Critical Service"):
-        with st.spinner("Analyzing Trust Scores & Blockchain History..."):
-            time.sleep(1) # UI Effect
+    if st.button("🚀 Deploy Critical Traffic Model"):
+        with st.spinner("Auditing Infrastructure Security..."):
+            time.sleep(1.5)
             
-            # CALL PLACEMENT CONTROLLER (Real Logic)
+            # CALL PLACEMENT CONTROLLER
             selected, msg = st.session_state.placement_controller.request_placement(st.session_state.nodes)
             
             if selected:
-                st.success(f"**DEPLOYED TO: {selected.node_id}**")
-                st.info(f"Trust Score: {selected.trust_score:.1f}")
-                st.caption(f"Transaction logged to Blockchain.")
+                st.success(f"**DEPLOYMENT SUCCESSFUL**")
+                st.write(f"Target: **{selected.node_id}**")
+                st.write(f"Security Rating: **{selected.trust_score:.1f}** (Highest Available)")
+                st.info("The system automatically bypassed compromised units (Red/Orange).")
             else:
                 st.error(msg)
 
 with col2:
-    st.subheader("📈 Trust Evolution")
+    st.subheader("📉 Integrity Evolution")
     if not st.session_state.chart_data.empty:
         st.line_chart(st.session_state.chart_data)
     else:
-        st.info("Run simulations in the sidebar to see live data.")
+        st.info("Waiting for telemetry data...")
 
-# C. BLOCKCHAIN LEDGER
-with st.expander("🔍 View Immutable Ledger (SHA-256 Hashes)"):
+# C. AUDIT LOG
+with st.expander("👮 View Forensic Ledger (Blockchain Audit Trail)"):
     chain_data = []
     for b in st.session_state.blockchain.chain:
         chain_data.append({
-            "Block": b.index,
-            "Validator": b.validator_id,
-            "Data": b.data,
-            "Hash": b.hash
+            "Block ID": b.index,
+            "Validator Authority": b.validator_id,
+            "Event Log": b.data,
+            "Cryptographic Hash": b.hash
         })
     st.dataframe(pd.DataFrame(chain_data))
