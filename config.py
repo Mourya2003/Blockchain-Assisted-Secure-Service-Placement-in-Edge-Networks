@@ -4,13 +4,14 @@ TrafficGuard Configuration
 Separates product settings from core blockchain logic
 """
 
-# Camera Network Configuration
+# Camera Network Configuration (6 Nodes)
 CAMERA_LOCATIONS = {
     "CAM_001": {"location": "Main St & 5th Ave", "type": "Speed Camera"},
     "CAM_002": {"location": "Highway 101 Exit", "type": "Red Light Camera"},
     "CAM_003": {"location": "School Zone - Elm St", "type": "Speed Camera"},
     "CAM_004": {"location": "Downtown Intersection", "type": "Traffic Monitor"},
     "CAM_005": {"location": "Bridge Entrance", "type": "Speed Camera"},
+    "CAM_006": {"location": "City Park West", "type": "Surveillance Unit"}
 }
 
 # Violation Types (Real Traffic Data)
