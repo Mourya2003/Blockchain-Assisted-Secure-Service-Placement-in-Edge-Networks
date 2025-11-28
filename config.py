@@ -1,10 +1,10 @@
 # config.py
 """
 TrafficGuard Configuration
-Separates product settings from core blockchain logic
+Includes Gas Fee Models for Priority Handling
 """
 
-# Camera Network Configuration (6 Nodes)
+# Camera Network Configuration
 CAMERA_LOCATIONS = {
     "CAM_001": {"location": "Main St & 5th Ave", "type": "Speed Camera"},
     "CAM_002": {"location": "Highway 101 Exit", "type": "Red Light Camera"},
@@ -14,20 +14,19 @@ CAMERA_LOCATIONS = {
     "CAM_006": {"location": "City Park West", "type": "Surveillance Unit"}
 }
 
-# Violation Types (Real Traffic Data)
-VIOLATION_TYPES = [
-    "Speed: 65mph in 45mph zone",
-    "Red Light Violation",
-    "Stop Sign Run",
-    "Illegal U-Turn",
-    "Speed: 35mph in School Zone (15mph)"
-]
+# Priority & Gas Fees (The New Economic Model)
+PRIORITY_LEVELS = {
+    "LOW (Routine Data)": 1,
+    "MEDIUM (Violation)": 5,
+    "HIGH (Accident Alert)": 20,
+    "CRITICAL (Ambulance/Police)": 100
+}
 
-# Trust Thresholds for Evidence
-EVIDENCE_TRUST_THRESHOLD = 70.0  # Camera must have 70+ trust for court evidence
-DEPLOYMENT_TRUST_THRESHOLD = 60.0  # Can operate, but evidence not court-valid
+# Trust Thresholds
+EVIDENCE_TRUST_THRESHOLD = 70.0
+DEPLOYMENT_TRUST_THRESHOLD = 60.0
 
-# Blockchain Authorities (Realistic)
+# Blockchain Validators
 VALIDATORS = [
     "City_Traffic_Department",
     "Police_Department_Server", 

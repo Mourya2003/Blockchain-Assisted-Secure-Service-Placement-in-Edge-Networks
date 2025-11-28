@@ -1,5 +1,4 @@
 import time
-# Import the Block class you just made
 from components.block import Block
 
 class Blockchain:
@@ -7,51 +6,79 @@ class Blockchain:
         self.chain = []
         self.validators = []
         self.current_validator = 0
+        
+        # MEMPOOL: Stores dicts {'data': str, 'gas': int, 'time': float}
+        self.pending_transactions = [] 
+        
         self.create_genesis_block()
 
     def create_genesis_block(self):
-        # The first block in the chain (Hardcoded)
         genesis = Block(0, "Genesis Block - System Boot", "0", "System_Root")
         self.chain.append(genesis)
 
     def add_validator(self, validator_id):
-        """Registers a node as a PoA Validator"""
         if validator_id not in self.validators:
             self.validators.append(validator_id)
 
     def get_next_validator(self):
-        """Round-Robin Validator Rotation (Proof-of-Authority)"""
-        if not self.validators:
-            return "Unknown_Validator"
-        
+        if not self.validators: return "Unknown"
         validator = self.validators[self.current_validator]
-        # Rotate to next
         self.current_validator = (self.current_validator + 1) % len(self.validators)
         return validator
 
-    def add_block(self, data):
+    # --- CORE FEATURE: ADD WITH GAS FEE ---
+    def add_transaction(self, data, gas_fee):
         """
-        1. Get Validator
-        2. Link to Previous Hash
-        3. Create & Seal Block
+        Adds a transaction to the Mempool with a specific Gas Fee.
         """
+        txn = {
+            "data": data,
+            "gas": gas_fee,
+            "timestamp": time.time(),
+            "formatted_time": time.strftime("%H:%M:%S")
+        }
+        self.pending_transactions.append(txn)
+        return len(self.pending_transactions)
+
+    # --- CORE FEATURE: MINE HIGHEST PRIORITY FIRST ---
+    def mine_pending_block(self):
+        """
+        Bundles transactions into a block, SORTED BY GAS FEE.
+        High gas transactions get processed first.
+        """
+        if not self.pending_transactions:
+            return None
+            
+        # 1. SORTING LOGIC (The "Real" Part)
+        # Sort by Gas (Descending), then by Time (Ascending)
+        sorted_txns = sorted(
+            self.pending_transactions, 
+            key=lambda x: (-x['gas'], x['timestamp'])
+        )
+        
+        # 2. Bundle Data (Simulating Block Size Limit)
+        # In real life, blocks have size limits. We take top 10.
+        selected_txns = sorted_txns[:10] 
+        
+        # Create readable string for the block
+        block_data = " | ".join([f"[Gas:{t['gas']}] {t['data']}" for t in selected_txns])
+        
+        # 3. Create Block
         validator = self.get_next_validator()
         previous_hash = self.chain[-1].hash
-        
-        # Create the Block using your block.py class
-        new_block = Block(len(self.chain), data, previous_hash, validator)
-        
+        new_block = Block(len(self.chain), block_data, previous_hash, validator)
         self.chain.append(new_block)
+        
+        # 4. Remove mined transactions from buffer
+        # (Keep the ones that didn't fit, if any)
+        self.pending_transactions = sorted_txns[10:]
+        
         return new_block
 
     def is_chain_valid(self):
-        """Verifies integrity (Tamper Detection)"""
         for i in range(1, len(self.chain)):
             current = self.chain[i]
-            previous = self.chain[i - 1]
-
-            if current.hash != current.calculate_hash():
-                return False
-            if current.previous_hash != previous.hash:
-                return False
+            prev = self.chain[i - 1]
+            if current.hash != current.calculate_hash(): return False
+            if current.previous_hash != prev.hash: return False
         return True
