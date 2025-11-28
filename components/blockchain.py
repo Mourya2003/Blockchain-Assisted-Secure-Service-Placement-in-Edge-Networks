@@ -6,14 +6,11 @@ class Blockchain:
         self.chain = []
         self.validators = []
         self.current_validator = 0
-        
-        # MEMPOOL: Stores dicts {'data': str, 'gas': int, 'time': float}
         self.pending_transactions = [] 
-        
         self.create_genesis_block()
 
     def create_genesis_block(self):
-        genesis = Block(0, "Genesis Block - System Boot", "0", "System_Root")
+        genesis = Block(0, "Genesis Block", "0", "System_Root")
         self.chain.append(genesis)
 
     def add_validator(self, validator_id):
@@ -26,11 +23,14 @@ class Blockchain:
         self.current_validator = (self.current_validator + 1) % len(self.validators)
         return validator
 
-    # --- CORE FEATURE: ADD WITH GAS FEE ---
+    def add_block(self, data):
+        validator = self.get_next_validator()
+        previous_hash = self.chain[-1].hash if self.chain else "0"
+        new_block = Block(len(self.chain), data, previous_hash, validator)
+        self.chain.append(new_block)
+        return new_block
+
     def add_transaction(self, data, gas_fee):
-        """
-        Adds a transaction to the Mempool with a specific Gas Fee.
-        """
         txn = {
             "data": data,
             "gas": gas_fee,
@@ -40,40 +40,33 @@ class Blockchain:
         self.pending_transactions.append(txn)
         return len(self.pending_transactions)
 
-    # --- CORE FEATURE: MINE HIGHEST PRIORITY FIRST ---
     def mine_pending_block(self):
-        """
-        Bundles transactions into a block, SORTED BY GAS FEE.
-        High gas transactions get processed first.
-        """
         if not self.pending_transactions:
             return None
             
-        # 1. SORTING LOGIC (The "Real" Part)
-        # Sort by Gas (Descending), then by Time (Ascending)
+        # 1. SORT BY GAS (Highest Fee First)
+        # This is the "Priority" logic
         sorted_txns = sorted(
             self.pending_transactions, 
             key=lambda x: (-x['gas'], x['timestamp'])
         )
         
-        # 2. Bundle Data (Simulating Block Size Limit)
-        # In real life, blocks have size limits. We take top 10.
-        selected_txns = sorted_txns[:10] 
+        # 2. CAP THE BLOCK (The "Realism" Upgrade)
+        # We limit the block to only 3 transactions.
+        # This forces "Congestion" so you can see low-fee items get left behind.
+        BLOCK_CAPACITY = 3 
         
-        # Create readable string for the block
-        block_data = " | ".join([f"[Gas:{t['gas']}] {t['data']}" for t in selected_txns])
+        accepted_txns = sorted_txns[:BLOCK_CAPACITY]
+        leftover_txns = sorted_txns[BLOCK_CAPACITY:]
         
-        # 3. Create Block
-        validator = self.get_next_validator()
-        previous_hash = self.chain[-1].hash
-        new_block = Block(len(self.chain), block_data, previous_hash, validator)
-        self.chain.append(new_block)
+        # 3. Create the Block
+        block_data = " | ".join([f"[Gas:{t['gas']}] {t['data']}" for t in accepted_txns])
+        new_block = self.add_block(block_data)
         
-        # 4. Remove mined transactions from buffer
-        # (Keep the ones that didn't fit, if any)
-        self.pending_transactions = sorted_txns[10:]
+        # 4. Update Mempool (Keep the leftovers waiting)
+        self.pending_transactions = leftover_txns
         
-        return new_block
+        return new_block, len(leftover_txns) # Return count of leftovers
 
     def is_chain_valid(self):
         for i in range(1, len(self.chain)):

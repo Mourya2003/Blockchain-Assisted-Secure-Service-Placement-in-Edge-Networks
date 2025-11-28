@@ -1,10 +1,10 @@
 # config.py
 """
 TrafficGuard Configuration
-Includes Gas Fee Models for Priority Handling
+Includes Gas Fee Models AND Violation Types
 """
 
-# Camera Network Configuration
+# Camera Network Configuration (6 Nodes)
 CAMERA_LOCATIONS = {
     "CAM_001": {"location": "Main St & 5th Ave", "type": "Speed Camera"},
     "CAM_002": {"location": "Highway 101 Exit", "type": "Red Light Camera"},
@@ -14,7 +14,18 @@ CAMERA_LOCATIONS = {
     "CAM_006": {"location": "City Park West", "type": "Surveillance Unit"}
 }
 
-# Priority & Gas Fees (The New Economic Model)
+# --- MISSING PART RESTORED BELOW ---
+# Violation Types (Required by traffic_monitor.py)
+VIOLATION_TYPES = [
+    "Speed: 65mph in 45mph zone",
+    "Red Light Violation",
+    "Stop Sign Run",
+    "Illegal U-Turn",
+    "Speed: 35mph in School Zone (15mph)"
+]
+
+# --- NEW ENTERPRISE FEATURES ---
+# Priority & Gas Fees (The Economic Model)
 PRIORITY_LEVELS = {
     "LOW (Routine Data)": 1,
     "MEDIUM (Violation)": 5,

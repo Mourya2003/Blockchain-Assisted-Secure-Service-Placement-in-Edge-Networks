@@ -68,18 +68,18 @@ with col3: st.metric("Blockchain Height", len(st.session_state.blockchain.chain)
 st.markdown("---")
 
 # ==========================================
-# 1. TRAFFIC INJECTOR (WITH GAS FEES)
+# 1. TRAFFIC INJECTOR (WITH ATTACK OPTION)
 # ==========================================
 col_left, col_mid, col_right = st.columns([1, 1.5, 1])
 
 with col_left:
     st.subheader("1. Inject Traffic")
-    st.info("Simulate data packets with different Priority Levels (Gas Fees).")
+    st.info("Simulate data packets. Use 'Corrupt Data' to test security.")
     
     sel_id = st.selectbox("Source Camera", list(st.session_state.cameras.keys()))
     sel_node = next(n for n in st.session_state.camera_nodes if n.node_id == sel_id)
     
-    # THE UPGRADE: PRIORITY SELECTOR
+    # PRIORITY SELECTOR
     priority_label = st.select_slider(
         "Select Data Priority", 
         options=list(PRIORITY_LEVELS.keys())
@@ -88,23 +88,31 @@ with col_left:
     
     col_a, col_b = st.columns(2)
     with col_a:
-        if st.button("📤 Send Data", type="primary", use_container_width=True):
-            # 1. Update Trust
+        if st.button("📤 Send Valid Data", type="primary", use_container_width=True):
+            # 1. Update Trust (Success)
             st.session_state.trust_manager.update_trust(sel_node, True)
             
-            # 2. Add to Mempool with Gas
-            data_packet = f"{sel_id}: Routine_Check | Status: OK"
+            # 2. Add to Mempool
+            data_packet = f"{sel_id}: Standard_Telemetry | Status: VERIFIED"
             st.session_state.blockchain.add_transaction(data_packet, gas_fee)
-            st.success(f"Queued with {gas_fee} Gas")
+            st.success(f"Queued (Gas: {gas_fee})")
 
     with col_b:
-        if st.button("🚑 EMERGENCY ALERT", type="primary", use_container_width=True):
-            # Instant High Gas
-            st.session_state.trust_manager.update_trust(sel_node, True)
-            data_packet = f"🚨 {sel_id}: CRITICAL ACCIDENT DETECTED"
-            # Emergency gets 100 Gas
-            st.session_state.blockchain.add_transaction(data_packet, 100)
-            st.error("EMERGENCY BROADCAST QUEUED (100 GAS)")
+        if st.button("⚠️ Send Corrupt Data", type="secondary", use_container_width=True):
+            # 1. Update Trust (Failure - Penalty Applied)
+            new_trust = st.session_state.trust_manager.update_trust(sel_node, False)
+            
+            # 2. Add 'Attack' packet to Mempool
+            data_packet = f"🚨 {sel_id}: MALFORMED_PACKET | HACK_ATTEMPT"
+            st.session_state.blockchain.add_transaction(data_packet, gas_fee)
+            st.error(f"Attack Queued! Trust Dropped.")
+
+    # Emergency Button
+    if st.button("🚑 EMERGENCY OVERRIDE (100 GAS)", use_container_width=True):
+        st.session_state.trust_manager.update_trust(sel_node, True)
+        data_packet = f"🚨 {sel_id}: CRITICAL ACCIDENT DETECTED"
+        st.session_state.blockchain.add_transaction(data_packet, 100)
+        st.warning("CRITICAL ALERT JUMPED TO FRONT OF QUEUE")
 
 with col_mid:
     st.subheader("2. Mempool (Priority Queue)")
@@ -113,7 +121,6 @@ with col_mid:
     pending = st.session_state.blockchain.pending_transactions
     if pending:
         # VISUALIZE SORTING
-        # We manually sort here just for display so you can see what the Miner WILL do
         display_list = sorted(pending, key=lambda x: -x['gas'])
         
         for txn in display_list[:6]:
@@ -125,11 +132,17 @@ with col_mid:
             
         if len(pending) > 6: st.caption(f"...and {len(pending)-6} low-priority items waiting.")
         
-        if st.button("⛏️ MINE BLOCK (Process High Priority)", type="secondary", use_container_width=True):
+        if st.button("⛏️ MINE BLOCK (Process High Priority)", type="primary", use_container_width=True):
             with st.spinner("Validator selecting highest fees..."):
                 time.sleep(1)
-                new_block = st.session_state.blockchain.mine_pending_block()
-                st.success(f"Block #{new_block.index} Mined! (High Gas Txns included)")
+                # UPDATED CALL
+                new_block, leftovers = st.session_state.blockchain.mine_pending_block()
+                
+                st.success(f"Block #{new_block.index} Mined! (Capacity: 3 Txns)")
+                if leftovers > 0:
+                    st.warning(f"{leftovers} Low-Gas Transactions left in Mempool (Congestion).")
+                else:
+                    st.info("Mempool Cleared.")
                 st.balloons()
     else:
         st.info("Mempool Empty.")
@@ -144,15 +157,47 @@ with col_right:
         st.progress(min(int(node.trust_score), 100))
 
 # ==========================================
-# 2. AI DEPLOYMENT & LEDGER
+# 2. AI DEPLOYMENT
 # ==========================================
 st.markdown("---")
-with st.expander("🚀 Service Deployment & Audit Trail"):
-    if st.button("Run Placement Controller"):
-        best, msg = st.session_state.placement_controller.request_placement(st.session_state.camera_nodes)
-        if best: st.success(f"Deployed to {best.node_id} (Trust: {best.trust_score:.1f})")
-        else: st.error(msg)
-        
-    st.write("#### Latest Blocks")
-    for b in st.session_state.blockchain.chain[-3:]:
-        st.text(f"Block #{b.index} [{b.validator_id}]: {b.data[:80]}...")
+st.subheader("🚀 Service Deployment (Research Core)")
+if st.button("Run Placement Controller"):
+    best, msg = st.session_state.placement_controller.request_placement(st.session_state.camera_nodes)
+    if best: 
+        st.success(f"Deployed to {best.node_id}")
+        st.json({
+            "Target Node": best.node_id,
+            "Trust Score": f"{best.trust_score:.1f}",
+            "Consensus": "Placement Logged on Chain"
+        })
+    else: 
+        st.error(msg)
+
+# ==========================================
+# 3. LEDGER AUDIT (THE UPGRADE YOU ASKED FOR)
+# ==========================================
+with st.expander("🔍 View Immutable Blockchain Ledger", expanded=True):
+    st.write("### Cryptographic Audit Trail")
+    
+    # Create a nice clean table for the ledger
+    chain_data = []
+    for b in st.session_state.blockchain.chain:
+        chain_data.append({
+            "Block #": b.index,
+            "Timestamp": b.timestamp,
+            "Validator Authority": b.validator_id,
+            "SHA-256 Hash": b.hash,  # <--- HERE IS THE HASH
+            "Data Payload": b.data
+        })
+    
+    # Display as a rich interactive dataframe
+    st.dataframe(
+        pd.DataFrame(chain_data),
+        column_config={
+            "Block #": st.column_config.NumberColumn(format="%d"),
+            "SHA-256 Hash": st.column_config.TextColumn(width="medium"),
+            "Data Payload": st.column_config.TextColumn(width="large"),
+        },
+        use_container_width=True,
+        hide_index=True
+    )
